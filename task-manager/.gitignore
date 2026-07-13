@@ -1,0 +1,27 @@
+# Maven / Gradle build outputs
+/target/
+/build/
+
+# IDE files
+.vscode/
+.idea/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.*
+
+# Spring Boot
+application-*.properties
+!application.properties
+
+# Test output
+/test-output.txt
+/compile-output.txt
