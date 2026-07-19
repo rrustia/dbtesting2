@@ -116,14 +116,21 @@ Include the token in subsequent requests as: `Authorization: Bearer <token>`
 - `GET /api/projects/{projectId}/tasks/assignee/{assigneeId}` - Tasks assigned to a user
 - `GET /api/projects/{projectId}/tasks/overdue` - Overdue tasks
 
-## Tech Stack
+## Technologies Used
 
-- Java 17
-- Spring Boot 3.2
-- Spring Security with JWT (jjwt)
-- Spring Data JPA
-- H2 Database (in-memory, swap to PostgreSQL for production)
-- Maven
+| Category | Technology |
+|----------|------------|
+| Language | Java 17 |
+| Build Tool | Maven |
+| Framework | Spring Boot 3.2.1 |
+| Web/API | Spring Boot Starter Web |
+| Security | Spring Security |
+| Authentication | JWT (jjwt 0.12.3) |
+| Data Access | Spring Data JPA |
+| Validation | Spring Boot Starter Validation |
+| Database | H2 Database (in-memory) |
+| Boilerplate Reduction | Lombok |
+| Testing | Spring Boot Starter Test, Spring Security Test |
 
 ## Database Inspection
 
