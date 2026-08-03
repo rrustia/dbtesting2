@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Task Manager</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; background: #f5f7fb; color: #1f2937; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+        .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+        h1, h2 { margin-top: 0; }
+        form { display: grid; gap: 10px; }
+        input, select, textarea, button { font: inherit; padding: 10px; border-radius: 8px; border: 1px solid #d1d5db; }
+        button { cursor: pointer; background: #2563eb; color: white; border: none; }
+        .row { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+        .status { padding: 6px 10px; border-radius: 999px; display: inline-block; font-size: 0.9rem; }
+        .status.todo { background: #e0f2fe; color: #075985; }
+        .status.in_progress { background: #fef3c7; color: #92400e; }
+        .status.done { background: #dcfce7; color: #166534; }
+        .muted { color: #6b7280; }
+        .hidden { display: none; }
+        #message { min-height: 24px; margin-top: 8px; font-weight: 600; }
+        #projects, #tasks { list-style: none; padding: 0; display: grid; gap: 8px; }
+        #projects li, #tasks li { border: 1px solid #e5e7eb; padding: 12px; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>Task Manager</h1>
+            <p class="muted">Use the browser to register, sign in, create projects, add tasks, and review your work.</p>
+            <div id="message">Welcome. Create an account or sign in to start.</div>
+        </div>
+
+        <div class="card">
+            <h2>Account</h2>
+            <div class="row">
+                <form id="registerForm">
+                    <h3>Register</h3>
+                    <input id="registerUsername" placeholder="Username" required />
+                    <input id="registerEmail" type="email" placeholder="Email" required />
+                    <input id="registerPassword" type="password" placeholder="Password" required />
+                    <button type="submit">Create account</button>
+                </form>
+                <form id="loginForm">
+                    <h3>Sign in</h3>
+                    <input id="loginUsername" placeholder="Username" required />
+                    <input id="loginPassword" type="password" placeholder="Password" required />
+                    <button type="submit">Sign in</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Projects</h2>
+            <form id="projectForm">
+                <div class="row">
+                    <input id="projectName" placeholder="Project name" required />
+                    <input id="projectDescription" placeholder="Description" />
+                </div>
+                <button type="submit">Create project</button>
+            </form>
+            <ul id="projects"></ul>
+        </div>
+
+        <div class="card">
+            <h2>Tasks</h2>
+            <form id="taskForm">
+                <div class="row">
+                    <input id="taskTitle" placeholder="Task title" required />
+                    <input id="taskDescription" placeholder="Description" />
+                    <select id="taskPriority">
+                        <option value="LOW">Low</option>
+                        <option value="MEDIUM">Medium</option>
+                        <option value="HIGH">High</option>
+                    </select>
+                    <input id="taskAssigneeId" placeholder="Assignee ID" />
+                    <input id="taskDueDate" type="date" />
+                </div>
+                <div class="row">
+                    <select id="taskProjectId" required></select>
+                    <button type="submit">Create task</button>
+                </div>
+            </form>
+            <ul id="tasks"></ul>
+        </div>
+    </div>
+
+    <script>
+        const state = {
+            token: localStorage.getItem('token') || '',
+            userId: localStorage.getItem('userId') || '',
+            username: localStorage.getItem('username') || '',
+            projects: []
+        };
+
+        const messageEl = document.getElementById('message');
+        const projectList = document.getElementById('projects');
+        const taskList = document.getElementById('tasks');
+        const projectSelect = document.getElementById('taskProjectId');
+
+        function setMessage(text) {
+            messageEl.textContent = text;
+        }
+
+        function buildHeaders(includeAuth = true) {
+            const headers = { 'Content-Type': 'application/json' };
+            if (includeAuth && state.token) {
+                headers['Authorization'] = `Bearer ${state.token}`;
+            }
+            return headers;
+        }
+
+        async function api(path, options = {}) {
+            const response = await fetch(path, {
+                headers: buildHeaders(options.auth !== false),
+                ...options
+            });
+            const data = await response.text();
+            let payload = null;
+            try { payload = data ? JSON.parse(data) : null; } catch (e) { payload = data; }
+            if (!response.ok) {
+                throw new Error(payload?.error || payload?.message || 'Request failed');
+            }
+            return payload;
+        }
+
+        async function loadProjects() {
+            if (!state.userId) {
+                projectList.innerHTML = '';
+                projectSelect.innerHTML = '<option value="">Select a project</option>';
+                return;
+            }
+            try {
+                const projects = await api(`/api/projects/owner/${state.userId}`);
+                state.projects = projects;
+                projectList.innerHTML = '';
+                projectSelect.innerHTML = '<option value="">Select a project</option>';
+                projects.forEach(project => {
+                    const option = document.createElement('option');
+                    option.value = project.id;
+                    option.textContent = project.name;
+                    projectSelect.appendChild(option);
+
+                    const item = document.createElement('li');
+                    item.innerHTML = `<strong>${project.name}</strong><br>${project.description || 'No description'}<br><span class="muted">ID: ${project.id}</span>`;
+                    projectList.appendChild(item);
+                });
+            } catch (error) {
+                setMessage(error.message);
+            }
+        }
+
+        async function loadTasks() {
+            if (!state.projects.length) {
+                taskList.innerHTML = '';
+                return;
+            }
+            try {
+                const projectId = state.projects[0]?.id;
+                if (!projectId) {
+                    taskList.innerHTML = '';
+                    return;
+                }
+                const tasks = await api(`/api/projects/${projectId}/tasks`);
+                taskList.innerHTML = '';
+                if (!tasks.length) {
+                    taskList.innerHTML = '<li>No tasks yet.</li>';
+                    return;
+                }
+                tasks.forEach(task => {
+                    const item = document.createElement('li');
+                    const statusClass = task.status ? task.status.toLowerCase().replace(/_/g, '_') : 'todo';
+                    item.innerHTML = `<strong>${task.title}</strong> <span class="status ${statusClass}">${task.status || 'TODO'}</span><br>${task.description || 'No description'}<br><span class="muted">Priority: ${task.priority || 'LOW'} · Assignee: ${task.assigneeUsername || 'Unassigned'} · Due: ${task.dueDate || 'None'}</span>`;
+                    taskList.appendChild(item);
+                });
+            } catch (error) {
+                setMessage(error.message);
+            }
+        }
+
+        document.getElementById('registerForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            try {
+                const payload = await api('/api/auth/register', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        username: document.getElementById('registerUsername').value,
+                        email: document.getElementById('registerEmail').value,
+                        password: document.getElementById('registerPassword').value
+                    }),
+                    auth: false
+                });
+                state.token = payload.token;
+                state.userId = payload.userId;
+                state.username = payload.username;
+                localStorage.setItem('token', state.token);
+                localStorage.setItem('userId', state.userId);
+                localStorage.setItem('username', state.username);
+                setMessage(`Registered as ${state.username}`);
+                await loadProjects();
+                await loadTasks();
+            } catch (error) {
+                setMessage(error.message);
+            }
+        });
+
+        document.getElementById('loginForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            try {
+                const payload = await api('/api/auth/login', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        username: document.getElementById('loginUsername').value,
+                        password: document.getElementById('loginPassword').value
+                    }),
+                    auth: false
+                });
+                state.token = payload.token;
+                state.userId = payload.userId;
+                state.username = payload.username;
+                localStorage.setItem('token', state.token);
+                localStorage.setItem('userId', state.userId);
+                localStorage.setItem('username', state.username);
+                setMessage(`Signed in as ${state.username}`);
+                await loadProjects();
+                await loadTasks();
+            } catch (error) {
+                setMessage(error.message);
+            }
+        });
+
+        document.getElementById('projectForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            try {
+                await api(`/api/projects/owner/${state.userId}`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        name: document.getElementById('projectName').value,
+                        description: document.getElementById('projectDescription').value
+                    })
+                });
+                document.getElementById('projectForm').reset();
+                await loadProjects();
+                setMessage('Project created.');
+            } catch (error) {
+                setMessage(error.message);
+            }
+        });
+
+        document.getElementById('taskForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            try {
+                const projectId = projectSelect.value;
+                await api(`/api/projects/${projectId}/tasks`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        title: document.getElementById('taskTitle').value,
+                        description: document.getElementById('taskDescription').value,
+                        priority: document.getElementById('taskPriority').value,
+                        assigneeId: document.getElementById('taskAssigneeId').value ? Number(document.getElementById('taskAssigneeId').value) : null,
+                        dueDate: document.getElementById('taskDueDate').value || null
+                    })
+                });
+                document.getElementById('taskForm').reset();
+                await loadTasks();
+                setMessage('Task created.');
+            } catch (error) {
+                setMessage(error.message);
+            }
+        });
+
+        loadProjects();
+        loadTasks();
+    </script>
+</body>
+</html>

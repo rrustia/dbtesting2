@@ -50,28 +50,28 @@ public class DataInitializer implements CommandLineRunner {
         System.out.println("Seeding database with sample data...");
 
         // A small set of demo accounts keeps local testing straightforward.
-        User admin = User.builder()
-                .username("admin")
-                .email("admin@example.com")
-                .password(passwordEncoder.encode("admin123"))
-                .role(User.Role.ADMIN)
-                .build();
-
         User user1 = User.builder()
-                .username("johndoe")
-                .email("john@example.com")
-                .password(passwordEncoder.encode("pass123"))
+                .username("rrustia")
+                .email("rrustia@example.com")
+                .password(passwordEncoder.encode("password123"))
                 .role(User.Role.USER)
                 .build();
 
         User user2 = User.builder()
-                .username("janedoe")
-                .email("jane@example.com")
-                .password(passwordEncoder.encode("pass123"))
+                .username("mike")
+                .email("mike@example.com")
+                .password(passwordEncoder.encode("password123"))
                 .role(User.Role.USER)
                 .build();
 
-        userRepository.saveAll(java.util.List.of(admin, user1, user2));
+        User user3 = User.builder()
+                .username("mary")
+                .email("mary@example.com")
+                .password(passwordEncoder.encode("password123"))
+                .role(User.Role.USER)
+                .build();
+
+        userRepository.saveAll(java.util.List.of(user1, user2, user3));
 
         // Demo projects give the seeded users immediate data to browse.
         Project project1 = Project.builder()
@@ -137,6 +137,6 @@ public class DataInitializer implements CommandLineRunner {
         taskRepository.saveAll(java.util.List.of(task1, task2, task3, task4, task5));
 
         System.out.println("Sample data seeded successfully.");
-                System.out.println("Demo login credentials: admin/admin123 or johndoe/pass123");
+        System.out.println("Demo login credentials: rrustia/password123, mike/password123, or mary/password123");
     }
 }

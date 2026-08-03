@@ -1,120 +1,139 @@
-# Task Manager API
+# Task Manager
 
-A RESTful task management API built with Spring Boot 3, Spring Security (JWT), and Spring Data JPA.
+A browser-based task manager built with Spring Boot 3.2.1, Spring Security with JWT, and Spring Data JPA. The recommended experience is to open the app in a browser and use the built-in UI for registration, sign-in, project creation, and task management. The REST API remains available for integrations and direct testing.
 
-## Quick Start
+## Requirements
 
-```bash
+This project is intended for Windows users running the commands below in PowerShell.
+
+- Windows 10 or newer
+- Java 17
+- Maven 3.9+
+- A terminal such as PowerShell
+
+## From start to finish
+
+Follow this sequence in PowerShell. Open a PowerShell window in the project folder and type each command in that window unless a step says to use a second window.
+
+1. Start the application:
+
+```powershell
 mvn spring-boot:run
 ```
 
-The app starts on port 8080 with an in-memory H2 database.
+2. Open a web browser and go to http://localhost:8080/. The landing page includes the browser UI for:
 
-### Sample Credentials
+   - registering a new account
+   - signing in
+   - creating projects
+   - creating and viewing tasks
 
-The application seeds these demo accounts on startup for local testing and API exploration.
+3. Use the demo accounts or create your own account:
 
-| Username   | Password  | Role   |
-|------------|-----------|--------|
-| admin      | admin123  | ADMIN  |
-| johndoe    | pass123   | USER   |
-| janedoe    | pass123   | USER   |
+   - rrustia / password123
+   - mike / password123
+   - mary / password123
 
-## How to Test It
+4. If you want to inspect the data directly, open the separate H2 database browser at http://localhost:8080/h2-console. This is not part of the main task manager GUI. On that page, fill in the form with these values: in the JDBC URL field, type jdbc:h2:file:./taskdb; in the Username field, type sa; leave the Password field empty, then press Connect.
 
-### 1. Start the application
+5. If you need to work with the API directly, the auth and project/task endpoints are available as documented below. A typical PowerShell login example is:
 
-```bash
-mvn spring-boot:run
+```powershell
+$body = '{"username":"rrustia","password":"password123"}'
+$response = Invoke-RestMethod -Method Post -Uri "http://localhost:8080/api/auth/login" -ContentType "application/json" -Body $body
+$response.token
 ```
 
-The app runs on port 8080 and uses an in-memory H2 database.
+6. Use the returned token in the Authorization header for protected requests when you need to call the API manually.
 
-### 2. Try the API
+7. To see the data the app is storing, open the H2 console and type queries into the SQL box. For example, type SELECT * FROM users; to view users, SELECT * FROM projects; to view projects, or SELECT * FROM tasks; to view tasks. Then click Run to see the rows stored by the app.
 
-#### In a web browser
+The application starts on port 8080 and uses a local file-based H2 database stored in the project root. On the first start it seeds demo users, projects, and tasks so the browser UI has sample data to work with.
 
-Brave can be used to test the API directly from the built-in developer tools. That workflow works well for anyone who wants a simple visual view of requests and responses.
+### Default URLs
 
-1. Start the application and make sure it is running on port 8080.
-2. Open Brave and go to `http://localhost:8080` or any page that loads successfully.
-3. Open the developer tools by pressing `F12` or selecting the Brave menu, then `More tools`, then `Developer tools`.
-4. Switch to the `Network` tab to view HTTP traffic.
-5. In the network tab, the `Preserve log` option can stay enabled when several requests need to be reviewed in one session.
-6. To send a `POST` request through the browser, use a lightweight REST client extension or a small HTML form served from a local file. In that tool, enter the URL `http://localhost:8080/api/auth/login`, choose `POST`, and set the content type to `application/json`.
-7. Paste the following JSON body into the request body field:
+- API base: http://localhost:8080
+- H2 console: http://localhost:8080/h2-console
+  - JDBC URL: jdbc:h2:file:./taskdb
+  - Username: sa
+  - Password: blank
 
-```json
-{
-  "username": "admin",
-  "password": "admin123"
-}
+The H2 database file is created in the project root of the workspace as taskdb.mv.db.
+
+## Demo accounts
+
+The application seeds these accounts on startup.
+
+| Username | Password | Role | Notes |
+|----------|----------|------|-------|
+| rrustia | password123 | USER | Seeded user who owns the demo projects |
+| mike | password123 | USER | Seeded user with assigned tasks |
+| mary | password123 | USER | Seeded user for additional demo activity |
+
+## Authentication and request examples
+
+The auth endpoints are public:
+
+- POST /api/auth/register
+- POST /api/auth/login
+
+The browser UI uses the same JWT-based authentication flow as the API. In practice, the browser handles sign-in and token storage for you, while create, update, and delete requests still require a bearer token.
+
+### Log in with PowerShell
+
+```powershell
+$body = '{"username":"rrustia","password":"password123"}'
+$response = Invoke-RestMethod -Method Post -Uri "http://localhost:8080/api/auth/login" -ContentType "application/json" -Body $body
+$response.token
 ```
 
-8. Click `Send` or `Submit`. Brave then shows the request in the Network tab, and the response panel displays the server JSON.
-9. After the request completes, check the response body in the network panel. The server should return a JWT token.
-10. Copy the token and use it in the next request as an authorization header:
+The response returns a JWT token, the user id, and the username.
 
-```http
-Authorization: Bearer <token>
+### Call a project endpoint with the token
+
+```powershell
+$token = $response.token
+$headers = @{ Authorization = "Bearer $token" }
+Invoke-RestMethod -Method Get -Uri "http://localhost:8080/api/projects/owner/1" -Headers $headers
 ```
 
-11. Send a `GET` request to `http://localhost:8080/api/projects/owner/1` with that header included.
-12. When the request succeeds, the response shows the projects owned by user `1` in JSON format.
+Using the `userId` from the login response is usually a better choice than hard-coding the id.
 
-That Brave-based workflow is useful for visual API testing, HTTP header inspection, and quick confirmation that authentication and protected endpoints work correctly.
+## Run the tests
 
-#### In Postman
+From the project folder in PowerShell, run:
 
-1. Create a new `POST` request to `http://localhost:8080/api/auth/login`.
-2. Set the body to JSON with the sample credentials above.
-3. Copy the returned `token`.
-4. Create a new `GET` request to `http://localhost:8080/api/projects/owner/1` and add the header `Authorization: Bearer <token>`.
-
-#### With curl
-
-Login:
-
-```bash
-curl -X POST http://localhost:8080/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123"}'
-```
-
-Use the token to call a protected endpoint:
-
-```bash
-curl -X GET http://localhost:8080/api/projects/owner/1 \
-  -H "Authorization: Bearer <token>"
+```powershell
+mvn test
 ```
 
 ## API Endpoints
 
 ### Authentication (public)
 
-- `POST /api/auth/register` - Register a new account
-- `POST /api/auth/login` - Login and receive a JWT token
+- POST /api/auth/register - Register a new account
+- POST /api/auth/login - Login and receive a JWT token
 
-Include the token in subsequent requests as: `Authorization: Bearer <token>`
+Include the token in later requests as: Authorization: Bearer <token>
 
 ### Projects
 
-- `GET /api/projects/owner/{ownerId}` - Get projects for a user
-- `GET /api/projects/{id}` - Get project details
-- `POST /api/projects/owner/{ownerId}` - Create a project
-- `PUT /api/projects/{id}` - Update a project
-- `DELETE /api/projects/{id}` - Delete a project
+- GET /api/projects/owner/{ownerId} - Get projects for a user
+- GET /api/projects/{id} - Get project details
+- POST /api/projects/owner/{ownerId} - Create a project (requires auth)
+- PUT /api/projects/{id} - Update a project (requires auth)
+- DELETE /api/projects/{id} - Delete a project (requires auth)
 
 ### Tasks
 
-- `GET /api/projects/{projectId}/tasks` - Get tasks in a project
-- `GET /api/projects/{projectId}/tasks/{taskId}` - Get a specific task
-- `POST /api/projects/{projectId}/tasks` - Create a task
-- `PUT /api/projects/{projectId}/tasks/{taskId}` - Update a task
-- `PATCH /api/projects/{projectId}/tasks/{taskId}/status/{status}` - Change task status
-- `DELETE /api/projects/{projectId}/tasks/{taskId}` - Delete a task
-- `GET /api/projects/{projectId}/tasks/assignee/{assigneeId}` - Tasks assigned to a user
-- `GET /api/projects/{projectId}/tasks/overdue` - Overdue tasks
+- GET /api/projects/{projectId}/tasks - Get tasks in a project
+- GET /api/projects/{projectId}/tasks/{taskId} - Get a specific task
+- POST /api/projects/{projectId}/tasks - Create a task (requires auth)
+- PUT /api/projects/{projectId}/tasks/{taskId} - Update a task (requires auth)
+- PATCH /api/projects/{projectId}/tasks/{taskId}/status/{status} - Change task status (requires auth)
+- DELETE /api/projects/{projectId}/tasks/{taskId} - Delete a task (requires auth)
+- GET /api/projects/{projectId}/tasks/assignee/{assigneeId} - Tasks assigned to a user
+- GET /api/projects/{projectId}/tasks/overdue - Overdue tasks
 
 ## Technologies Used
 
@@ -128,7 +147,7 @@ Include the token in subsequent requests as: `Authorization: Bearer <token>`
 | Authentication | JWT (jjwt 0.12.3) |
 | Data Access | Spring Data JPA |
 | Validation | Spring Boot Starter Validation |
-| Database | H2 Database (in-memory) |
+| Database | H2 Database (file-based) |
 | Boilerplate Reduction | Lombok |
 | Testing | Spring Boot Starter Test, Spring Security Test |
 
@@ -136,7 +155,7 @@ Include the token in subsequent requests as: `Authorization: Bearer <token>`
 
 ### H2 Console
 
-Visit `http://localhost:8080/h2-console` while the app is running. Use `jdbc:h2:mem:taskdb` as the JDBC URL with username `sa` and no password.
+While the app is running, open a web browser and go to http://localhost:8080/h2-console. Use jdbc:h2:file:./taskdb as the JDBC URL with username sa and no password.
 
 ### Example queries
 
@@ -153,26 +172,5 @@ To view all projects owned by a specific user, use:
 ```sql
 SELECT id, name, description, owner_id
 FROM projects
-WHERE owner_id = 1;
+WHERE owner_id = 2;
 ```
-
-### Web GUI request examples
-
-For a browser-based API client instead of the H2 console, this flow works well:
-
-1. Open `http://localhost:8080/api/auth/login`.
-2. Set the method to `POST` and send:
-
-```json
-{
-  "username": "admin",
-  "password": "admin123"
-}
-```
-
-3. Copy the returned token.
-4. Open `http://localhost:8080/api/projects/owner/1` and set:
-   - Method: `GET`
-   - Header: `Authorization: Bearer <token>`
-
-That request returns the projects for owner `1` after authentication.
